@@ -99,9 +99,10 @@ class PllavaConfig(PretrainedConfig):
         alpha=0.1,
         head=0,
         softmax=1.0,
-        tau=1.0, 
-        cluster_ratio=1.0, 
+        tau=1.0,
+        cluster_ratio=1.0,
         temporal_segment_ratio=1.0,
+        prune_enabled=True,
         **kwargs,
     ):
         self.ignore_index = ignore_index
@@ -119,6 +120,7 @@ class PllavaConfig(PretrainedConfig):
         self.tau = tau
         self.cluster_ratio = cluster_ratio
         self.temporal_segment_ratio = temporal_segment_ratio
+        self.prune_enabled = prune_enabled
         
         self.vision_config = vision_config
         

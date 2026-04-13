@@ -592,6 +592,7 @@ class PllavaForConditionalGeneration(PllavaPreTrainedModel):
         config.text_config.alpha = config.alpha
         config.text_config.softmax = config.softmax
         config.text_config.pooling_shape = config.pooling_shape
+        config.text_config.prune_enabled = getattr(config, 'prune_enabled', True)
         self.pad_token_id = self.config.pad_token_id if self.config.pad_token_id is not None else self.config.text_config.pad_token_id
         assert self.pad_token_id is not None, 'provide the model with pad_token_id, this would be used to arranging new embedings'
         config.text_config.pad_token_id = self.pad_token_id
@@ -964,7 +965,13 @@ class PllavaForConditionalGeneration(PllavaPreTrainedModel):
                                                             num_videos=pixel_values.shape[0]//self.config.num_frames//batch_size,
                                                             num_frames=self.config.num_frames)
 
-                image_features, static_sizes, dynamic_sizes, window_sizes = self.merge_frames_dynamic(image_features, threshold=self.config.tau, k=7)
+                if getattr(self.config, 'prune_enabled', True):
+                    image_features, static_sizes, dynamic_sizes, window_sizes = self.merge_frames_dynamic(image_features, threshold=self.config.tau, k=7)
+                else:
+                    # True pruning-disable: preserve token order/count, no clustering, no dynamic split.
+                    static_sizes = [image_features.shape[1]]
+                    dynamic_sizes = [0]
+                    window_sizes = [self.config.num_frames]
 
                 inputs_embeds, attention_mask, labels, position_ids, input_ids = self._merge_input_ids_with_image_features(
                     image_features, inputs_embeds, input_ids, attention_mask, labels

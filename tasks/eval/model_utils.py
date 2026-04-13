@@ -169,14 +169,14 @@ def load_llava_next_video(repo_id, num_frames, use_lora=False, weight_dir=None, 
 
     return model, processor
 
-def load_pllava(repo_id, num_frames, use_lora=False, weight_dir=None, lora_alpha=32, use_multi_gpus=False, pooling_shape=(16,12,12),selected_layer=10, alpha=0.1, head=0, softmax=1.0, tau=1.0, cluster_ratio=1.0, temporal_segment_ratio=1.0):
+def load_pllava(repo_id, num_frames, use_lora=False, weight_dir=None, lora_alpha=32, use_multi_gpus=False, pooling_shape=(16,12,12),selected_layer=10, alpha=0.1, head=0, softmax=1.0, tau=1.0, cluster_ratio=1.0, temporal_segment_ratio=1.0, prune_enabled=True):
     kwargs = {
         'num_frames': num_frames,
     }
     # print("===============>pooling_shape", pooling_shape)
     if num_frames == 0:
         kwargs.update(pooling_shape=(0,12,12)) # produce a bug if ever usen the pooling projector
-    
+
     if 'llava' in repo_id:
         config = PllavaConfig.from_pretrained(
             repo_id if not use_lora else weight_dir,
@@ -188,6 +188,7 @@ def load_pllava(repo_id, num_frames, use_lora=False, weight_dir=None, lora_alpha
             tau=tau,
             cluster_ratio=cluster_ratio,
             temporal_segment_ratio=temporal_segment_ratio,
+            prune_enabled=prune_enabled,
             **kwargs,
         )
         with torch.no_grad():

@@ -1454,7 +1454,9 @@ class LlamaModelVTP(LlamaModel):
                 all_self_attns += (layer_outputs[1],)
 
             # used for LLM-VTP
-            if layer_idx==self.selected_layer and (hidden_states.shape[1] > 1):
+            if (layer_idx == self.selected_layer
+                    and hidden_states.shape[1] > 1
+                    and getattr(self.config, 'prune_enabled', True)):
                 past_key_values, hidden_states, all_hidden_states, causal_mask, attention_mask, position_ids, cache_position = \
                     self.cache(past_key_values, input_ids_new, layer_outputs[1], hidden_states, all_hidden_states, causal_mask, \
                         attention_mask, self.pad_token_id, position_ids, text_indices, \

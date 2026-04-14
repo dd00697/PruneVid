@@ -105,10 +105,46 @@ class VidHallucDataset(EvalDataset):
         return "\n".join(lines)
 
     def __getitem__(self, index: int) -> Dict[str, Any]:
+        # Decode videos inside an isolated child process so a corrupt mp4
+        # that hangs decord (seen on VidHalluc's ACH subset, e.g.
+        # eXMF6Skt2To_clip_3.mp4) can be hard-killed instead of stalling
+        # the entire eval. signal.alarm is not enough because decord blocks
+        # inside C code that doesn't process Python signals.
+        import multiprocessing as mp
         ex = self.data_list[index]
-        images = self.read_video(ex["video_path"])
+
+        def _worker(video_path, num_segments, q):
+            try:
+                from decord import VideoReader, cpu
+                from PIL import Image
+                vr = VideoReader(video_path, ctx=cpu(0), num_threads=1)
+                max_frame = len(vr) - 1
+                seg = float(max_frame + 1) / num_segments
+                idxs = [int((seg / 2) + round(seg * i)) for i in range(num_segments)]
+                idxs = [min(max(0, i), max_frame) for i in idxs]
+                frames = [Image.fromarray(vr[i].asnumpy()) for i in idxs]
+                q.put(("ok", frames))
+            except Exception as exc:
+                q.put(("err", repr(exc)))
+
+        ctx = mp.get_context("spawn")
+        q = ctx.Queue()
+        proc = ctx.Process(target=_worker, args=(ex["video_path"], self.num_segments, q))
+        proc.start()
+        proc.join(timeout=45)
+        if proc.is_alive():
+            proc.terminate()
+            proc.join(5)
+            if proc.is_alive():
+                proc.kill()
+            raise TimeoutError(f"video decode timeout (45s): {ex['video_id']}")
+        if q.empty():
+            raise RuntimeError(f"video decode produced no output: {ex['video_id']}")
+        status, payload = q.get()
+        if status == "err":
+            raise RuntimeError(f"video decode error for {ex['video_id']}: {payload}")
         out = dict(ex)
-        out["images"] = images
+        out["images"] = payload
         return out
 
     def _append(self, subset: str, video_id: str, question: str, gold: str,

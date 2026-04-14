@@ -293,6 +293,23 @@ find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null
 ### tmux session "died" after laptop sleep
 It didn't — the pod runs independently. Reconnect (Jupyter → Terminal), `tmux attach -t eval`. If `tmux ls` shows no sessions, either the job finished or the pod crashed. Check `/workspace/full_run.log` for the last lines.
 
+### Progress bar stuck on a single example for many minutes
+A corrupted VidHalluc video is hanging decord. The fork already handles this: `VidHallucDataset.__getitem__` decodes videos in a child process with a 45-second hard timeout, and `pllava_eval_vidhalluc.py` catches the timeout and writes a skipped-placeholder record so the run continues. A skipped example appears in `predictions.jsonl` with `"skipped": true` and `"pred": null`.
+
+If the run still appears to hang longer than ~60 seconds on one example, check the log:
+```bash
+tail -30 /workspace/full_run.log | grep -v "mmco\|h264"
+grep -c "Skipping idx=" /workspace/full_run.log
+```
+
+Known bad file encountered during bring-up: `eXMF6Skt2To_clip_3.mp4` in the ACH subset. If you want to speed things up, move it out before the run:
+```bash
+mkdir -p /workspace/VidHalluc/_bad_videos
+mv /workspace/VidHalluc/data/ACH/eXMF6Skt2To_clip_3.mp4 /workspace/VidHalluc/_bad_videos/ 2>/dev/null
+```
+
+The subprocess-based decode adds ~0.3-0.5 s per example overhead (spawning a child + loading decord), which translates to ~1-2 extra hours over 13.8k examples. That's the cost of reliability; it's not negotiable given the hang issue.
+
 ---
 
 ## Part 3 — Colab (only if you can't use RunPod)
@@ -343,8 +360,8 @@ Upstream pins `transformers==4.37.1` in requirements but the code actually needs
    - `from mmcv.runner import load_checkpoint` wrapped in `try/except` with a stub fallback, so mmcv is optional (the only consumer is the optical-flow model which VidHalluc doesn't use).
 
 5. **`tasks/eval/vidhalluc/`** — new module:
-   - `__init__.py`: `VidHallucDataset(EvalDataset)` flattening all 4 subsets, robust video-path resolver (handles TSH's nested unzip layout), `build_prompt` / `parse_answer` / `is_correct` helpers.
-   - `pllava_eval_vidhalluc.py`: single-process eval script with **hard-coded greedy decoding** (`do_sample=False, num_beams=1, temperature=1.0, top_p=1.0, max_new_tokens=32`) so pruned vs baseline cannot drift on decoding params. Writes `predictions.jsonl` + `summary.json` + `run_meta.json`.
+   - `__init__.py`: `VidHallucDataset(EvalDataset)` flattening all 4 subsets, robust video-path resolver (handles TSH's nested unzip layout), `build_prompt` / `parse_answer` / `is_correct` helpers. `__getitem__` decodes videos in an isolated subprocess with a 45-second hard-kill timeout — handles VidHalluc's occasional corrupt h264 streams that freeze decord indefinitely inside C code (signal.alarm is not enough).
+   - `pllava_eval_vidhalluc.py`: single-process eval script with **hard-coded greedy decoding** (`do_sample=False, num_beams=1, temperature=1.0, top_p=1.0, max_new_tokens=32`) so pruned vs baseline cannot drift on decoding params. Catches `TimeoutError`/`RuntimeError` from the video decoder and writes a skipped-placeholder record (`"skipped": true`) so the output indices stay aligned. Writes `predictions.jsonl` + `summary.json` + `run_meta.json`.
    - `compare.py`: prints baseline / pruned / delta tables with per-subset yes-rate deltas.
 
 6. **`scripts/eval_vidhalluc.sh`** — bash runner. Smoke + full sweep, tmux-ready. Already wired with `--use_lora --lora_alpha 14 --weight_dir "$MODEL"` because the `ermu2001/pllava-7b` checkpoint is a PEFT-wrapped half-merged LoRA.

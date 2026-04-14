@@ -191,7 +191,32 @@ def main():
     fout = open(pred_path, "w", encoding="utf-8")
     try:
         for idx in tqdm(range(len(dataset)), desc="VidHalluc"):
-            ex = dataset[idx]
+            try:
+                ex = dataset[idx]
+            except (TimeoutError, RuntimeError) as exc:
+                meta = dataset.data_list[idx]
+                logger.warning("Skipping idx=%d video=%s: %s",
+                               idx, meta.get("video_id", "?"), exc)
+                # Emit a placeholder record so the output file lines up with
+                # the dataset index and so the summary reflects the skip.
+                rec = {
+                    "subset": meta.get("subset"),
+                    "sample_id": meta.get("sample_id"),
+                    "video_id": meta.get("video_id"),
+                    "video_path": meta.get("video_path"),
+                    "question": meta.get("question"),
+                    "options": meta.get("options"),
+                    "gold": meta.get("gold"),
+                    "raw_output": "",
+                    "pred": None,
+                    "correct": False,
+                    "skipped": True,
+                    "skip_reason": str(exc),
+                }
+                records.append(rec)
+                fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                fout.flush()
+                continue
             user_query = build_prompt(ex)
 
             conv = conv_templates[args.conv_mode].copy()

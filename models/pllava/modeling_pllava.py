@@ -1044,8 +1044,12 @@ class PllavaForConditionalGeneration(PllavaPreTrainedModel):
             attention_mask = outputs.attention_mask if outputs.attention_mask is not None else attention_mask
         except:
             pass
-        if flag:
-            labels = torch.full_like(attention_mask, self.config.ignore_index).to(torch.long)
+        # Disabled: synthesizing labels during generation crashes when pruning shrinks
+        # the sequence (logits has post-pruning length, attention_mask has pre-pruning length,
+        # so the shift_logits/shift_labels indexing below fails). During inference we don't
+        # need loss computation, so leaving labels=None is the cleaner path.
+        # if flag:
+        #     labels = torch.full_like(attention_mask, self.config.ignore_index).to(torch.long)
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n

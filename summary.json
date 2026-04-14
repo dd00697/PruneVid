@@ -1,0 +1,48 @@
+{
+  "totals": {
+    "n": 20,
+    "correct": 0,
+    "accuracy": 0.0
+  },
+  "per_subset": {
+    "ach_binaryqa": {
+      "n": 20,
+      "correct": 0,
+      "accuracy": 0.0,
+      "yes_rate": 0.0
+    }
+  },
+  "config": {
+    "pretrained_model_name_or_path": "MODELS/pllava-7b",
+    "num_frames": 16,
+    "pooling_shape": [
+      16,
+      12,
+      12
+    ],
+    "disable_pruning": true,
+    "selected_layer": 10,
+    "alpha": 0.4,
+    "tau": 0.8,
+    "temporal_segment_ratio": 0.25,
+    "cluster_ratio": 0.5,
+    "softmax": 1.0,
+    "head": 8,
+    "conv_mode": "plain",
+    "decoding": {
+      "do_sample": false,
+      "num_beams": 1,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "repetition_penalty": 1.0,
+      "length_penalty": 1.0,
+      "max_new_tokens": 32
+    },
+    "subsets": [
+      "ach_binaryqa"
+    ],
+    "max_samples": 20,
+    "missing_videos": {},
+    "data_root": "/workspace/VidHalluc"
+  }
+}

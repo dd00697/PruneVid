@@ -21,6 +21,9 @@ SKIP_FULL="${SKIP_FULL:-0}"
 
 COMMON_ARGS=(
     --pretrained_model_name_or_path "$MODEL"
+    --use_lora
+    --lora_alpha 14
+    --weight_dir "$MODEL"
     --num_frames "$NUM_FRAMES"
     --pooling_shape "16-12-12"
 )

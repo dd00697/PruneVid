@@ -8,7 +8,13 @@ from tasks.eval.eval_utils import Conversation
 from models.pllava import PllavaProcessor, PllavaForConditionalGeneration, PllavaConfig
 from accelerate import init_empty_weights, dispatch_model, infer_auto_device_map,load_checkpoint_in_model
 from accelerate.utils import get_balanced_memory
-from mmcv.runner import load_checkpoint
+try:
+    from mmcv.runner import load_checkpoint
+except Exception:
+    # mmcv is only used for the optional optical-flow checkpoint which VidHalluc doesn't need.
+    # Fall back to a stub so load_pllava's try/except block just logs and continues.
+    def load_checkpoint(*args, **kwargs):
+        raise RuntimeError('mmcv not installed; optical-flow checkpoint unavailable')
 import logging
 logging.basicConfig()
 logger = logging.getLogger(__name__)

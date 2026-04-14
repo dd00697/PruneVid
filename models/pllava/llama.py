@@ -300,9 +300,9 @@ class LlamaMLP(nn.Module):
         self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=config.mlp_bias)
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=getattr(config, 'mlp_bias', False))
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=getattr(config, 'mlp_bias', False))
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=getattr(config, 'mlp_bias', False))
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
@@ -1479,12 +1479,14 @@ class LlamaModelVTP(LlamaModel):
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
         
+        # transformers 4.40 compat: BaseModelOutputWithPast has no `attention_mask` field.
+        # With `prune_enabled=False` the mask is unchanged from the input anyway; with pruning on,
+        # the shrunk mask is still applied to later decoder layers via the local variable.
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
-            attention_mask=attention_mask
         )
 
 class TextPivotMerge_LayerWise:
@@ -2283,13 +2285,13 @@ class LlamaForCausalLMVTP(LlamaForCausalLM):
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
+        # transformers 4.40 compat: CausalLMOutputWithPast has no `attention_mask` field.
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-            attention_mask=outputs.attention_mask
         )
 
 class LlamaForCausalLMElastic(LlamaForCausalLM):
